@@ -43,8 +43,46 @@
         <ul>
           <li>Use Storage Lab to simulate throughput and latency tests.</li>
           <li>Launch HTML Studio for a live markup sandbox.</li>
-          <li>Pin frequently used tools to the taskbar for fast access.</li>
+          <li>Customize themes, motion and more from Control Center.</li>
         </ul>
+      </section>
+      <section class="widget telemetry-widget" aria-label="Live diagnostics">
+        <h2>Live Diagnostics</h2>
+        <div class="telemetry-metric" data-metric="iops" data-min="28" data-max="96" data-value="68" data-unit="%">
+          <div class="metric-header">
+            <span class="label">IOPS Load</span>
+            <output>0%</output>
+          </div>
+          <div class="metric-bar">
+            <span class="fill"></span>
+          </div>
+        </div>
+        <div class="telemetry-metric" data-metric="cache" data-min="12" data-max="82" data-value="46" data-unit="%">
+          <div class="metric-header">
+            <span class="label">Cache Residency</span>
+            <output>0%</output>
+          </div>
+          <div class="metric-bar">
+            <span class="fill"></span>
+          </div>
+        </div>
+        <div
+          class="telemetry-metric"
+          data-metric="temp"
+          data-min="30"
+          data-max="62"
+          data-value="44"
+          data-unit="°C"
+          data-precision="1"
+        >
+          <div class="metric-header">
+            <span class="label">Controller Temp</span>
+            <output>0°C</output>
+          </div>
+          <div class="metric-bar heat">
+            <span class="fill"></span>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -74,6 +112,10 @@
         <article class="start-tile" data-app="notes">
           <span class="icon">📝</span>
           <span class="label">Quick Notes</span>
+        </article>
+        <article class="start-tile" data-app="settings">
+          <span class="icon">⚙️</span>
+          <span class="label">Control Center</span>
         </article>
       </section>
       <section class="start-recommendations" aria-label="Recent activity">
@@ -235,6 +277,196 @@
       </div>
     </section>
 
+    <section
+      id="settingsWindow"
+      class="window"
+      role="dialog"
+      aria-label="Control Center"
+      aria-hidden="true"
+    >
+      <header class="window-titlebar">
+        <div class="title">
+          <span class="icon">⚙️</span>
+          <h2>Control Center</h2>
+        </div>
+        <div class="window-actions">
+          <button class="window-action" data-action="minimize" aria-label="Minimize Control Center">–</button>
+          <button class="window-action close" data-action="close" aria-label="Close Control Center">×</button>
+        </div>
+      </header>
+      <div class="window-body settings-body">
+        <aside class="settings-nav" role="tablist" aria-label="Settings sections">
+          <button
+            type="button"
+            class="active"
+            data-section="appearance"
+            aria-controls="settingsAppearance"
+            role="tab"
+            aria-selected="true"
+          >
+            <span class="icon">🎨</span>
+            <span class="label">Appearance</span>
+          </button>
+          <button
+            type="button"
+            data-section="personalization"
+            aria-controls="settingsPersonalization"
+            role="tab"
+            aria-selected="false"
+          >
+            <span class="icon">🪟</span>
+            <span class="label">Personalization</span>
+          </button>
+          <button
+            type="button"
+            data-section="system"
+            aria-controls="settingsSystem"
+            role="tab"
+            aria-selected="false"
+          >
+            <span class="icon">🧩</span>
+            <span class="label">System</span>
+          </button>
+          <button
+            type="button"
+            data-section="about"
+            aria-controls="settingsAbout"
+            role="tab"
+            aria-selected="false"
+          >
+            <span class="icon">ℹ️</span>
+            <span class="label">About</span>
+          </button>
+        </aside>
+        <div class="settings-content">
+          <section
+            id="settingsAppearance"
+            class="settings-panel active"
+            data-section="appearance"
+            aria-hidden="false"
+            role="tabpanel"
+          >
+            <header>
+              <h3>Ambient look</h3>
+              <p>Switch between crafted themes and tailor the cursor to your workspace.</p>
+            </header>
+            <div id="themeOptions" class="theme-options" role="radiogroup" aria-label="Ambient theme options"></div>
+            <label class="field">
+              <span class="field-label">Cursor style</span>
+              <select id="cursorSelect">
+                <option value="modern">Glass pointer</option>
+                <option value="system">System default</option>
+                <option value="contrast">High contrast</option>
+              </select>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" id="ambientToggle" />
+              <span class="toggle-indicator" aria-hidden="true"></span>
+              <span class="toggle-label">
+                Ambient lights
+                <small>Disable the floating light accents for distraction-free focus.</small>
+              </span>
+            </label>
+          </section>
+          <section
+            id="settingsPersonalization"
+            class="settings-panel"
+            data-section="personalization"
+            aria-hidden="true"
+            role="tabpanel"
+          >
+            <header>
+              <h3>Comfort &amp; motion</h3>
+              <p>Fine-tune window motion and workspace density to match your preference.</p>
+            </header>
+            <fieldset class="field">
+              <legend class="field-label">Interface motion</legend>
+              <label class="option">
+                <input type="radio" name="motionPref" value="full" />
+                <span>
+                  <strong>Expressive</strong>
+                  <small>Retain full window and menu animations.</small>
+                </span>
+              </label>
+              <label class="option">
+                <input type="radio" name="motionPref" value="reduced" />
+                <span>
+                  <strong>Reduced</strong>
+                  <small>Simplify transitions for a calmer workspace.</small>
+                </span>
+              </label>
+            </fieldset>
+            <label class="toggle">
+              <input type="checkbox" id="tipsToggle" />
+              <span class="toggle-indicator" aria-hidden="true"></span>
+              <span class="toggle-label">
+                Quick tips widget
+                <small>Hide onboarding hints once you know your way around.</small>
+              </span>
+            </label>
+          </section>
+          <section
+            id="settingsSystem"
+            class="settings-panel"
+            data-section="system"
+            aria-hidden="true"
+            role="tabpanel"
+          >
+            <header>
+              <h3>System behavior</h3>
+              <p>Control startup behavior and what shows in your status area.</p>
+            </header>
+            <label class="toggle">
+              <input type="checkbox" id="autoOpenToggle" />
+              <span class="toggle-indicator" aria-hidden="true"></span>
+              <span class="toggle-label">
+                Launch Storage Lab on start
+                <small>Have throughput testing ready the moment the desktop loads.</small>
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-label">Clock format</span>
+              <select id="clockSelect">
+                <option value="12h">12-hour</option>
+                <option value="24h">24-hour</option>
+              </select>
+            </label>
+          </section>
+          <section
+            id="settingsAbout"
+            class="settings-panel"
+            data-section="about"
+            aria-hidden="true"
+            role="tabpanel"
+          >
+            <header>
+              <h3>About OSTOST Workbench</h3>
+              <p>A modern, Windows-inspired shell purpose-built for storage validation.</p>
+            </header>
+            <dl class="about-grid">
+              <div>
+                <dt>Build</dt>
+                <dd>Horizon 1.1 "Citrine"</dd>
+              </div>
+              <div>
+                <dt>Render engine</dt>
+                <dd>Vanilla JS desktop shell</dd>
+              </div>
+              <div>
+                <dt>Shortcuts</dt>
+                <dd>Ctrl + , opens Control Center</dd>
+              </div>
+              <div>
+                <dt>Status</dt>
+                <dd>Ready for HTML &amp; storage drills</dd>
+              </div>
+            </dl>
+            <button id="resetPreferences" class="secondary">Reset preferences</button>
+          </section>
+        </div>
+      </div>
+    </section>
+
     <div
       id="desktopContextMenu"
       class="context-menu"
@@ -249,6 +481,10 @@
       <button type="button" class="context-item" role="menuitem" data-action="cascade">
         <span class="icon">🪟</span>
         <span class="label">Cascade open windows</span>
+      </button>
+      <button type="button" class="context-item" role="menuitem" data-action="settings">
+        <span class="icon">⚙️</span>
+        <span class="label">Open Control Center</span>
       </button>
       <button type="button" class="context-item" role="menuitem" data-action="refresh">
         <span class="icon">🔁</span>
@@ -265,6 +501,7 @@
       <button class="taskbar-button" data-app="storage" aria-label="Open Storage Lab">💾</button>
       <button class="taskbar-button" data-app="html" aria-label="Open HTML Studio">🌐</button>
       <button class="taskbar-button" data-app="notes" aria-label="Open Quick Notes">📝</button>
+      <button class="taskbar-button" data-app="settings" aria-label="Open Control Center">⚙️</button>
     </div>
     <div class="taskbar-tray">
       <div class="tray-item" id="networkStatus" aria-live="polite">Connected</div>

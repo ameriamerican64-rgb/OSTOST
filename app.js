@@ -80,8 +80,22 @@ const ThemeManager = (() => {
     sunrise: 'Sunrise Bloom',
   };
   let index = 0;
+  const listeners = new Set();
+
+  const notify = (theme) => {
+    listeners.forEach((listener) => {
+      try {
+        listener(theme);
+      } catch (error) {
+        // Ignore listener failures to avoid breaking theme changes.
+      }
+    });
+  };
 
   const apply = (theme) => {
+    if (!themes.includes(theme)) {
+      return;
+    }
     document.body.dataset.theme = theme;
     try {
       localStorage.setItem(THEME_KEY, theme);
@@ -93,6 +107,7 @@ const ThemeManager = (() => {
     if (networkStatus) {
       networkStatus.textContent = `Connected • ${labels[theme]}`;
     }
+    notify(theme);
   };
 
   const cycle = () => {
@@ -120,7 +135,99 @@ const ThemeManager = (() => {
     return labels[next];
   };
 
-  return { load, cycle, nextLabel, apply };
+  const subscribe = (listener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
+
+  const list = () => themes.map((theme) => ({ id: theme, label: labels[theme] }));
+  const current = () => themes[index];
+
+  return { load, cycle, nextLabel, apply, subscribe, list, current };
+})();
+
+const Preferences = (() => {
+  const STORAGE_KEY = 'ostost-preferences';
+  const defaults = {
+    motion: 'full',
+    cursor: 'modern',
+    lights: true,
+    autoOpenStorage: true,
+    showTips: true,
+    clockFormat: '12h',
+  };
+
+  let state = { ...defaults };
+  const listeners = new Set();
+
+  const persist = () => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      // Persistence may fail in private contexts – ignore.
+    }
+  };
+
+  const apply = () => {
+    document.body.dataset.motion = state.motion;
+    document.body.dataset.cursor = state.cursor;
+    document.body.dataset.lights = state.lights ? 'on' : 'off';
+
+    const tipsWidget = qs('.tips-widget');
+    if (tipsWidget) {
+      tipsWidget.hidden = !state.showTips;
+      tipsWidget.setAttribute('aria-hidden', state.showTips ? 'false' : 'true');
+    }
+  };
+
+  const emit = (key) => {
+    listeners.forEach((listener) => {
+      try {
+        listener(key, state[key], { ...state });
+      } catch (error) {
+        // Ignore listener failures to keep settings resilient.
+      }
+    });
+  };
+
+  const set = (key, value) => {
+    if (!(key in state)) return;
+    if (state[key] === value) return;
+    state = { ...state, [key]: value };
+    apply();
+    persist();
+    emit(key);
+  };
+
+  const get = (key) => state[key];
+  const snapshot = () => ({ ...state });
+
+  const load = () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
+      if (stored && typeof stored === 'object') {
+        state = { ...defaults, ...stored };
+      }
+    } catch (error) {
+      state = { ...defaults };
+    }
+    apply();
+    return snapshot();
+  };
+
+  const reset = () => {
+    state = { ...defaults };
+    apply();
+    persist();
+    emit('reset');
+  };
+
+  const subscribe = (listener) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  };
+
+  return { load, apply, set, get, snapshot, reset, subscribe };
 })();
 
 const STORAGE_PROFILES = {
@@ -330,6 +437,7 @@ function openWindow(app) {
     storage: 'storageWindow',
     html: 'htmlWindow',
     notes: 'notesWindow',
+    settings: 'settingsWindow',
   };
   const windowId = idMap[app];
   if (!windowId) return;
@@ -490,6 +598,9 @@ function initContextMenu() {
       } else if (action === 'cascade') {
         WindowManager.cascade();
         hideMenu();
+      } else if (action === 'settings') {
+        hideMenu();
+        openWindow('settings');
       } else if (action === 'refresh') {
         hideMenu();
         window.location.reload();
@@ -672,19 +783,251 @@ function initNotes() {
   load();
 }
 
-function initClock() {
-  const clock = qs('#clock');
-  const update = () => {
-    const now = new Date();
-    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const date = now.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    clock.textContent = `${time}  •  ${date}`;
+function initTelemetry() {
+  const metrics = qsa('.telemetry-metric');
+  if (!metrics.length) return;
+
+  const trackers = metrics
+    .map((metric) => {
+      const fill = qs('.fill', metric);
+      const output = qs('output', metric);
+      if (!fill || !output) return null;
+      const min = Number(metric.dataset.min ?? 0);
+      const max = Number(metric.dataset.max ?? 100);
+      const unit = metric.dataset.unit ?? '%';
+      const precision = Number(metric.dataset.precision ?? 0);
+      const baseline = clamp(Number(metric.dataset.value ?? min), min, max);
+      return { element: metric, fill, output, min, max, unit, precision, value: baseline };
+    })
+    .filter(Boolean);
+
+  const updateMetric = (tracker) => {
+    const sway = (tracker.max - tracker.min) * 0.12;
+    const delta = (Math.random() - 0.5) * sway;
+    tracker.value = clamp(tracker.value + delta, tracker.min, tracker.max);
+    const percent = ((tracker.value - tracker.min) / (tracker.max - tracker.min)) * 100;
+    tracker.fill.style.width = `${Math.round(percent)}%`;
+    tracker.output.textContent = `${tracker.value.toFixed(tracker.precision)}${tracker.unit}`;
+    tracker.element.dataset.state = percent > 72 ? 'high' : percent < 28 ? 'low' : 'nominal';
   };
-  update();
-  setInterval(update, 15000);
+
+  const updateAll = () => trackers.forEach(updateMetric);
+
+  updateAll();
+  setInterval(updateAll, 4200);
 }
 
+const Clock = (() => {
+  let element = null;
+  let timer = null;
+
+  const formatTime = () => {
+    const now = new Date();
+    const is24h = Preferences.get('clockFormat') === '24h';
+    const time = now.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: !is24h,
+    });
+    const date = now.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    return `${time}  •  ${date}`;
+  };
+
+  const tick = () => {
+    if (!element) return;
+    element.textContent = formatTime();
+  };
+
+  const start = (node) => {
+    element = node;
+    if (!element) return;
+    tick();
+    if (timer) {
+      clearInterval(timer);
+    }
+    timer = setInterval(tick, 15000);
+  };
+
+  const refresh = () => tick();
+
+  return { start, refresh };
+})();
+
+function initSettings() {
+  const win = qs('#settingsWindow');
+  if (!win) return;
+
+  const navButtons = qsa('.settings-nav button', win);
+  const panels = qsa('.settings-panel', win);
+
+  const themeOptions = qs('#themeOptions', win);
+  if (themeOptions && !themeOptions.children.length) {
+    ThemeManager.list().forEach((theme) => {
+      const id = `theme-${theme.id}`;
+      const wrapper = document.createElement('label');
+      wrapper.className = 'theme-option';
+      wrapper.setAttribute('for', id);
+      wrapper.innerHTML = `
+        <input type="radio" name="themeChoice" id="${id}" value="${theme.id}" />
+        <span class="preview" data-theme="${theme.id}"></span>
+        <span class="label">${theme.label}</span>
+      `;
+      themeOptions.appendChild(wrapper);
+    });
+  }
+
+  const showSection = (section) => {
+    navButtons.forEach((button) => {
+      const isActive = button.dataset.section === section;
+      button.classList.toggle('active', isActive);
+      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    panels.forEach((panel) => {
+      const isActive = panel.dataset.section === section;
+      panel.classList.toggle('active', isActive);
+      panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+    });
+  };
+
+  navButtons.forEach((button) => {
+    button.addEventListener('click', () => showSection(button.dataset.section));
+  });
+
+  showSection('appearance');
+
+  const applyThemeSelection = (theme) => {
+    qsa('input[name="themeChoice"]', win).forEach((input) => {
+      input.checked = input.value === theme;
+    });
+  };
+
+  ThemeManager.subscribe((theme) => applyThemeSelection(theme));
+  applyThemeSelection(ThemeManager.current());
+
+  qsa('input[name="themeChoice"]', win).forEach((input) => {
+    input.addEventListener('change', (event) => {
+      if (event.target.checked) {
+        ThemeManager.apply(event.target.value);
+      }
+    });
+  });
+
+  const cursorSelect = qs('#cursorSelect', win);
+  const ambientToggle = qs('#ambientToggle', win);
+  const tipsToggle = qs('#tipsToggle', win);
+  const autoOpenToggle = qs('#autoOpenToggle', win);
+  const clockSelect = qs('#clockSelect', win);
+
+  const syncPreferences = () => {
+    const prefs = Preferences.snapshot();
+    qsa('input[name="motionPref"]', win).forEach((input) => {
+      input.checked = input.value === prefs.motion;
+    });
+    if (cursorSelect) {
+      cursorSelect.value = prefs.cursor;
+    }
+    if (ambientToggle) {
+      ambientToggle.checked = prefs.lights;
+    }
+    if (tipsToggle) {
+      tipsToggle.checked = prefs.showTips;
+    }
+    if (autoOpenToggle) {
+      autoOpenToggle.checked = prefs.autoOpenStorage;
+    }
+    if (clockSelect) {
+      clockSelect.value = prefs.clockFormat;
+    }
+  };
+
+  syncPreferences();
+
+  qsa('input[name="motionPref"]', win).forEach((input) => {
+    input.addEventListener('change', (event) => {
+      if (event.target.checked) {
+        Preferences.set('motion', event.target.value);
+      }
+    });
+  });
+
+  if (cursorSelect) {
+    cursorSelect.addEventListener('change', (event) => {
+      Preferences.set('cursor', event.target.value);
+    });
+  }
+
+  if (ambientToggle) {
+    ambientToggle.addEventListener('change', (event) => {
+      Preferences.set('lights', event.target.checked);
+    });
+  }
+
+  if (tipsToggle) {
+    tipsToggle.addEventListener('change', (event) => {
+      Preferences.set('showTips', event.target.checked);
+    });
+  }
+
+  if (autoOpenToggle) {
+    autoOpenToggle.addEventListener('change', (event) => {
+      Preferences.set('autoOpenStorage', event.target.checked);
+    });
+  }
+
+  if (clockSelect) {
+    clockSelect.addEventListener('change', (event) => {
+      Preferences.set('clockFormat', event.target.value);
+    });
+  }
+
+  const resetButton = qs('#resetPreferences', win);
+  if (resetButton) {
+    resetButton.addEventListener('click', () => {
+      const confirmed = window.confirm('Reset all OSTOST preferences to defaults?');
+      if (confirmed) {
+        Preferences.reset();
+        ThemeManager.apply('default');
+        applyThemeSelection(ThemeManager.current());
+        showSection('appearance');
+        syncPreferences();
+      }
+    });
+  }
+
+  const reactiveKeys = new Set([
+    'motion',
+    'cursor',
+    'lights',
+    'showTips',
+    'autoOpenStorage',
+    'clockFormat',
+    'reset',
+  ]);
+
+  Preferences.subscribe((key) => {
+    if (reactiveKeys.has(key)) {
+      syncPreferences();
+    }
+  });
+}
+
+function initShortcuts() {
+  document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === ',') {
+      event.preventDefault();
+      openWindow('settings');
+    }
+  });
+}
+
+Preferences.subscribe((key) => {
+  if (key === 'clockFormat' || key === 'reset') {
+    Clock.refresh();
+  }
+});
+
 window.addEventListener('DOMContentLoaded', () => {
+  Preferences.load();
   ThemeManager.load();
   initTaskbar();
   initWindows();
@@ -692,9 +1035,14 @@ window.addEventListener('DOMContentLoaded', () => {
   initStorageLab();
   initHtmlStudio();
   initNotes();
-  initClock();
+  initTelemetry();
+  initSettings();
+  Clock.start(qs('#clock'));
+  initShortcuts();
   window.addEventListener('resize', () => WindowManager.enforceBounds());
-  // Auto-open Storage Lab at launch for quick benchmarking.
-  openWindow('storage');
+  if (Preferences.get('autoOpenStorage')) {
+    // Auto-open Storage Lab at launch for quick benchmarking.
+    openWindow('storage');
+  }
   WindowManager.enforceBounds();
 });
