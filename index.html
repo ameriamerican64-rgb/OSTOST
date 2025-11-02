@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OSTOST Workbench</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body>
+  <div class="desktop" role="application" aria-label="OSTOST Workbench">
+    <div class="desktop-wallpaper" aria-hidden="true"></div>
+    <div class="desktop-widgets">
+      <section class="widget system-widget" aria-label="System snapshot">
+        <h2>System Snapshot</h2>
+        <dl>
+          <div>
+            <dt>Virtual Build</dt>
+            <dd>OSTOST Horizon 1.0</dd>
+          </div>
+          <div>
+            <dt>Focus</dt>
+            <dd>Storage &amp; HTML experimentation</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd class="status-online">Ready</dd>
+          </div>
+        </dl>
+      </section>
+      <section class="widget tips-widget" aria-label="Quick tips">
+        <h2>Quick Tips</h2>
+        <ul>
+          <li>Use Storage Lab to simulate throughput and latency tests.</li>
+          <li>Launch HTML Studio for a live markup sandbox.</li>
+          <li>Pin frequently used tools to the taskbar for fast access.</li>
+        </ul>
+      </section>
+    </div>
+
+    <nav id="startMenu" class="start-menu" aria-label="Start menu" aria-hidden="true">
+      <header>
+        <div class="profile">
+          <div class="avatar" aria-hidden="true">OS</div>
+          <div>
+            <strong>OSTOST Tester</strong>
+            <span>Workspace Ready</span>
+          </div>
+        </div>
+        <button class="close-start" aria-label="Close start menu">×</button>
+      </header>
+      <div class="search">
+        <input type="search" placeholder="Search tools, tests or docs" aria-label="Search the workspace" />
+      </div>
+      <section class="start-grid" aria-label="Pinned tools">
+        <article class="start-tile" data-app="storage">
+          <span class="icon">💾</span>
+          <span class="label">Storage Lab</span>
+        </article>
+        <article class="start-tile" data-app="html">
+          <span class="icon">🌐</span>
+          <span class="label">HTML Studio</span>
+        </article>
+        <article class="start-tile" data-app="notes">
+          <span class="icon">📝</span>
+          <span class="label">Quick Notes</span>
+        </article>
+      </section>
+      <section class="start-recommendations" aria-label="Recent activity">
+        <h3>Recent</h3>
+        <ul>
+          <li>
+            <span class="icon" aria-hidden="true">📦</span>
+            <div>
+              <strong>NVMe endurance sweep</strong>
+              <small>Storage Lab — completed 5 minutes ago</small>
+            </div>
+          </li>
+          <li>
+            <span class="icon" aria-hidden="true">🧪</span>
+            <div>
+              <strong>Flex layout harness</strong>
+              <small>HTML Studio — saved in snippets</small>
+            </div>
+          </li>
+        </ul>
+      </section>
+    </nav>
+
+    <section id="storageWindow" class="window" role="dialog" aria-label="Storage Lab" aria-hidden="true">
+      <header class="window-titlebar">
+        <div class="title">
+          <span class="icon">💾</span>
+          <h2>Storage Lab</h2>
+        </div>
+        <div class="window-actions">
+          <button class="window-action" data-action="minimize" aria-label="Minimize Storage Lab">–</button>
+          <button class="window-action close" data-action="close" aria-label="Close Storage Lab">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <div class="split">
+          <form id="storageForm" class="panel">
+            <h3>Test designer</h3>
+            <label>
+              Storage profile
+              <select name="profile" required>
+                <option value="nvme" selected>NVMe SSD</option>
+                <option value="sata">SATA SSD</option>
+                <option value="hdd">7200 RPM HDD</option>
+                <option value="custom">Custom Mix</option>
+              </select>
+            </label>
+            <label>
+              Sample size (GB)
+              <input type="number" name="size" min="1" max="2048" value="64" required />
+            </label>
+            <label>
+              Queue depth
+              <input type="range" name="queue" min="1" max="64" value="8" />
+              <output data-for="queue">8</output>
+            </label>
+            <label>
+              Workload blend
+              <select name="workload">
+                <option value="balanced" selected>Balanced (50/50)</option>
+                <option value="read">Read intensive</option>
+                <option value="write">Write intensive</option>
+                <option value="burst">Burst stress</option>
+              </select>
+            </label>
+            <label>
+              Noise level
+              <input type="range" name="variance" min="0" max="25" value="5" />
+              <output data-for="variance">5%</output>
+            </label>
+            <button type="submit" class="primary">Run simulation</button>
+          </form>
+          <section class="panel results" aria-live="polite">
+            <h3>Simulation log</h3>
+            <div class="summary">
+              <p><strong>Throughput:</strong> <span id="throughputSummary">—</span></p>
+              <p><strong>Latency:</strong> <span id="latencySummary">—</span></p>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Profile</th>
+                  <th>Size</th>
+                  <th>Queue</th>
+                  <th>Read MB/s</th>
+                  <th>Write MB/s</th>
+                  <th>Avg Latency</th>
+                </tr>
+              </thead>
+              <tbody id="storageResults"></tbody>
+            </table>
+          </section>
+        </div>
+        <section class="panel insights">
+          <h3>Insights</h3>
+          <ul>
+            <li>Queue depth amplifies NVMe throughput more than it does for HDD profiles.</li>
+            <li>Use the variance slider to simulate inconsistent power or workload spikes.</li>
+            <li>Export results by copying the table for quick reporting.</li>
+          </ul>
+        </section>
+      </div>
+    </section>
+
+    <section id="htmlWindow" class="window" role="dialog" aria-label="HTML Studio" aria-hidden="true">
+      <header class="window-titlebar">
+        <div class="title">
+          <span class="icon">🌐</span>
+          <h2>HTML Studio</h2>
+        </div>
+        <div class="window-actions">
+          <button class="window-action" data-action="minimize" aria-label="Minimize HTML Studio">–</button>
+          <button class="window-action close" data-action="close" aria-label="Close HTML Studio">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <div class="split column">
+          <section class="panel editor">
+            <h3>Markup</h3>
+            <textarea id="htmlInput" spellcheck="false" aria-label="HTML editor"></textarea>
+          </section>
+          <section class="panel editor">
+            <h3>Styles</h3>
+            <textarea id="cssInput" spellcheck="false" aria-label="CSS editor"></textarea>
+          </section>
+          <section class="panel preview" aria-label="HTML preview">
+            <h3>Live preview</h3>
+            <iframe id="previewFrame" title="HTML preview"></iframe>
+          </section>
+        </div>
+        <footer class="window-footer">
+          <button id="resetHtml" class="secondary">Reset sample</button>
+          <span>Updates render automatically as you type.</span>
+        </footer>
+      </div>
+    </section>
+
+    <section id="notesWindow" class="window" role="dialog" aria-label="Quick Notes" aria-hidden="true">
+      <header class="window-titlebar">
+        <div class="title">
+          <span class="icon">📝</span>
+          <h2>Quick Notes</h2>
+        </div>
+        <div class="window-actions">
+          <button class="window-action" data-action="minimize" aria-label="Minimize Quick Notes">–</button>
+          <button class="window-action close" data-action="close" aria-label="Close Quick Notes">×</button>
+        </div>
+      </header>
+      <div class="window-body">
+        <section class="panel notes">
+          <h3>Scratchpad</h3>
+          <textarea id="notesPad" placeholder="Capture findings, snippets or reminders..."></textarea>
+          <div class="notes-actions">
+            <button id="clearNotes" class="secondary">Clear</button>
+            <button id="exportNotes" class="secondary">Copy to clipboard</button>
+            <span id="notesStatus" role="status" aria-live="polite"></span>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <footer class="taskbar" role="navigation" aria-label="Taskbar">
+    <button id="startButton" class="taskbar-button start" aria-label="Open start menu">
+      <span class="icon">◉</span>
+    </button>
+    <div class="taskbar-center" role="group" aria-label="Pinned applications">
+      <button class="taskbar-button" data-app="storage" aria-label="Open Storage Lab">💾</button>
+      <button class="taskbar-button" data-app="html" aria-label="Open HTML Studio">🌐</button>
+      <button class="taskbar-button" data-app="notes" aria-label="Open Quick Notes">📝</button>
+    </div>
+    <div class="taskbar-tray">
+      <div class="tray-item" id="networkStatus" aria-live="polite">Connected</div>
+      <div class="tray-item" id="clock"></div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
