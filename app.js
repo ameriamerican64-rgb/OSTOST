@@ -6,6 +6,8 @@ const zStack = {
   },
 };
 
+const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
 const WindowManager = {
   windows: new Map(),
   register(win) {
@@ -19,13 +21,107 @@ const WindowManager = {
   },
   bringToFront(win) {
     this.clearActive();
+    win.classList.remove('animating-out');
     win.classList.add('active');
     zStack.bump(win);
+  },
+  clampPosition(win) {
+    if (!win) return;
+    const width = win.offsetWidth;
+    const height = win.offsetHeight;
+    const minLeft = 32;
+    const minTop = 72;
+    const maxLeft = Math.max(minLeft, window.innerWidth - width - 32);
+    const maxTop = Math.max(minTop, window.innerHeight - height - 140);
+    const currentLeft = parseFloat(win.style.left) || (window.innerWidth - width) / 2;
+    const currentTop = parseFloat(win.style.top) || (window.innerHeight - height) / 2;
+    const left = clamp(currentLeft, minLeft, Math.max(minLeft, maxLeft));
+    const top = clamp(currentTop, minTop, Math.max(minTop, maxTop));
+    win.style.left = `${left}px`;
+    win.style.top = `${top}px`;
+  },
+  enforceBounds() {
+    this.windows.forEach((win) => {
+      if (win.classList.contains('open')) {
+        this.clampPosition(win);
+      }
+    });
+  },
+  cascade() {
+    const openWindows = [...this.windows.values()].filter((win) => win.classList.contains('open'));
+    if (!openWindows.length) return;
+    const step = 36;
+    const baseLeft = Math.max(48, window.innerWidth * 0.1);
+    const baseTop = 96;
+    openWindows.forEach((win, index) => {
+      const offset = index * step;
+      const maxLeft = Math.max(32, window.innerWidth - win.offsetWidth - 48);
+      const maxTop = Math.max(72, window.innerHeight - win.offsetHeight - 160);
+      const left = clamp(baseLeft + offset, 32, maxLeft);
+      const top = clamp(baseTop + offset, 72, maxTop);
+      win.style.left = `${left}px`;
+      win.style.top = `${top}px`;
+      this.bringToFront(win);
+    });
   },
 };
 
 const qs = (selector, scope = document) => scope.querySelector(selector);
 const qsa = (selector, scope = document) => [...scope.querySelectorAll(selector)];
+
+let toggleStartMenu;
+
+const ThemeManager = (() => {
+  const THEME_KEY = 'ostost-theme';
+  const themes = ['default', 'aurora', 'sunrise'];
+  const labels = {
+    default: 'Horizon',
+    aurora: 'Aurora Drift',
+    sunrise: 'Sunrise Bloom',
+  };
+  let index = 0;
+
+  const apply = (theme) => {
+    document.body.dataset.theme = theme;
+    try {
+      localStorage.setItem(THEME_KEY, theme);
+    } catch (error) {
+      // Ignore persistence issues (private browsing, etc.)
+    }
+    index = themes.indexOf(theme);
+    const networkStatus = qs('#networkStatus');
+    if (networkStatus) {
+      networkStatus.textContent = `Connected • ${labels[theme]}`;
+    }
+  };
+
+  const cycle = () => {
+    const next = themes[(index + 1) % themes.length];
+    apply(next);
+    return labels[next];
+  };
+
+  const load = () => {
+    let stored = null;
+    try {
+      stored = localStorage.getItem(THEME_KEY);
+    } catch (error) {
+      stored = null;
+    }
+    if (stored && themes.includes(stored)) {
+      apply(stored);
+    } else {
+      apply(themes[0]);
+    }
+  };
+
+  const nextLabel = () => {
+    const next = themes[(index + 1) % themes.length];
+    return labels[next];
+  };
+
+  return { load, cycle, nextLabel, apply };
+})();
 
 const STORAGE_PROFILES = {
   nvme: { label: 'NVMe SSD', read: 7100, write: 6500, latency: 0.02 },
@@ -125,10 +221,17 @@ function initTaskbar() {
     const shouldOpen = typeof force === 'boolean' ? force : !startMenu.classList.contains('open');
     startMenu.classList.toggle('open', shouldOpen);
     startMenu.setAttribute('aria-hidden', !shouldOpen);
+    startButton.classList.toggle('active', shouldOpen);
+    startButton.setAttribute('aria-expanded', shouldOpen);
     if (shouldOpen) {
       zStack.bump(startMenu);
     }
   };
+
+  toggleStartMenu = toggleStart;
+
+  startButton.setAttribute('aria-haspopup', 'menu');
+  startButton.setAttribute('aria-expanded', 'false');
 
   startButton.addEventListener('click', (event) => {
     event.stopPropagation();
@@ -142,6 +245,12 @@ function initTaskbar() {
 
   document.addEventListener('click', (event) => {
     if (!startMenu.contains(event.target) && !startButton.contains(event.target)) {
+      toggleStart(false);
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
       toggleStart(false);
     }
   });
@@ -175,12 +284,15 @@ function initWindows() {
       dragging = false;
       document.removeEventListener('pointermove', onPointerMove);
       document.removeEventListener('pointerup', onPointerUp);
+      WindowManager.clampPosition(win);
     };
 
     titlebar.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
+      event.preventDefault();
       dragging = true;
       WindowManager.bringToFront(win);
+      win.classList.remove('animating-in');
       const rect = win.getBoundingClientRect();
       offsetX = event.clientX - rect.left;
       offsetY = event.clientY - rect.top;
@@ -191,12 +303,12 @@ function initWindows() {
 
   windows.forEach((win, index) => {
     WindowManager.register(win);
-    const isDefaultOpen = win.id === 'storageWindow';
-    win.style.left = `${520 + index * 32}px`;
-    win.style.top = `${80 + index * 24}px`;
-    if (isDefaultOpen) {
-      openWindow('storage');
-    }
+    win.dataset.minimized = 'false';
+    const baseLeft = 420 + index * 28;
+    const baseTop = 104 + index * 22;
+    win.style.left = `${baseLeft}px`;
+    win.style.top = `${baseTop}px`;
+    WindowManager.clampPosition(win);
     qs('.window-body', win).addEventListener('click', () => WindowManager.bringToFront(win));
     setupDrag(win);
 
@@ -222,33 +334,168 @@ function openWindow(app) {
   const windowId = idMap[app];
   if (!windowId) return;
   const win = WindowManager.get(windowId);
-  win.classList.add('open');
+  if (!win) return;
+  win.dataset.minimized = 'false';
   WindowManager.bringToFront(win);
+  WindowManager.clampPosition(win);
+  win.classList.add('open');
   win.setAttribute('aria-hidden', 'false');
-  qsa(`.taskbar-button[data-app]`).forEach((button) => {
-    button.classList.toggle('active', button.dataset.app === app);
-  });
+  win.classList.remove('animating-out');
+  win.classList.remove('animating-in');
+  void win.offsetWidth;
+  win.classList.add('animating-in');
+  win.addEventListener(
+    'animationend',
+    () => {
+      win.classList.remove('animating-in');
+    },
+    { once: true }
+  );
+  syncTaskbarState();
 }
 
 function closeWindow(windowId) {
   const win = WindowManager.get(windowId);
-  if (!win) return;
-  win.classList.remove('open');
-  win.classList.remove('active');
-  win.setAttribute('aria-hidden', 'true');
-  qsa(`.taskbar-button[data-app]`).forEach((button) => {
-    if (button.dataset.app && `${button.dataset.app}Window` === windowId) {
-      button.classList.remove('active');
-    }
-  });
+  if (!win || !win.classList.contains('open')) {
+    win?.setAttribute?.('aria-hidden', 'true');
+    return;
+  }
+  win.dataset.minimized = 'false';
+  win.classList.remove('animating-in');
+  win.classList.add('animating-out');
+  const handleClose = () => {
+    win.classList.remove('animating-out');
+    win.classList.remove('open');
+    win.classList.remove('active');
+    win.setAttribute('aria-hidden', 'true');
+    syncTaskbarState();
+  };
+  win.addEventListener('animationend', handleClose, { once: true });
 }
 
 function minimizeWindow(windowId) {
   const win = WindowManager.get(windowId);
-  if (!win) return;
-  win.classList.remove('open');
-  win.classList.remove('active');
-  win.setAttribute('aria-hidden', 'true');
+  if (!win || !win.classList.contains('open')) return;
+  win.dataset.minimized = 'true';
+  win.classList.remove('animating-in');
+  win.classList.add('animating-out');
+  const handleMinimize = () => {
+    win.classList.remove('animating-out');
+    win.classList.remove('open');
+    win.classList.remove('active');
+    win.setAttribute('aria-hidden', 'true');
+    syncTaskbarState();
+  };
+  win.addEventListener('animationend', handleMinimize, { once: true });
+}
+
+function syncTaskbarState() {
+  qsa(`.taskbar-button[data-app]`).forEach((button) => {
+    const targetId = `${button.dataset.app}Window`;
+    const targetWindow = WindowManager.get(targetId);
+    const isActive =
+      targetWindow &&
+      (targetWindow.classList.contains('open') || targetWindow.dataset.minimized === 'true');
+    button.classList.toggle('active', Boolean(isActive));
+  });
+}
+
+function initContextMenu() {
+  const desktop = qs('.desktop');
+  const menu = qs('#desktopContextMenu');
+  if (!desktop || !menu) return;
+
+  const themeLabel = qs('[data-action="cycle-theme"] .label', menu);
+
+  const updateThemeLabel = () => {
+    if (themeLabel) {
+      themeLabel.textContent = `Cycle ambient theme (${ThemeManager.nextLabel()})`;
+    }
+  };
+
+  updateThemeLabel();
+
+  const hideMenu = () => {
+    if (!menu.classList.contains('visible')) return;
+    menu.classList.remove('visible');
+    menu.setAttribute('aria-hidden', 'true');
+  };
+
+  const showMenu = (x, y) => {
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.classList.add('visible');
+    menu.setAttribute('aria-hidden', 'false');
+    const rect = menu.getBoundingClientRect();
+    let adjustedX = rect.left;
+    let adjustedY = rect.top;
+    if (rect.right > window.innerWidth) {
+      adjustedX = window.innerWidth - rect.width - 12;
+    }
+    if (rect.bottom > window.innerHeight) {
+      adjustedY = window.innerHeight - rect.height - 12;
+    }
+    menu.style.left = `${Math.max(12, adjustedX)}px`;
+    menu.style.top = `${Math.max(12, adjustedY)}px`;
+    updateThemeLabel();
+    const firstItem = qs('.context-item', menu);
+    firstItem?.focus();
+  };
+
+  desktop.addEventListener('contextmenu', (event) => {
+    if (!desktop.contains(event.target)) return;
+    if (event.target.closest('input, textarea, [contenteditable="true"]')) {
+      hideMenu();
+      return;
+    }
+    if (event.target.closest('.start-menu')) {
+      hideMenu();
+      return;
+    }
+    if (event.target.closest('.window')) {
+      hideMenu();
+      return;
+    }
+    event.preventDefault();
+    hideMenu();
+    toggleStartMenu?.(false);
+    showMenu(event.clientX, event.clientY);
+  });
+
+  menu.addEventListener('contextmenu', (event) => event.preventDefault());
+  menu.addEventListener('click', (event) => event.stopPropagation());
+
+  document.addEventListener('click', (event) => {
+    if (!menu.contains(event.target)) {
+      hideMenu();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      hideMenu();
+    }
+  });
+
+  window.addEventListener('resize', hideMenu);
+  document.addEventListener('scroll', hideMenu, true);
+
+  qsa('.context-item', menu).forEach((item) => {
+    item.addEventListener('click', () => {
+      const action = item.dataset.action;
+      if (action === 'cycle-theme') {
+        ThemeManager.cycle();
+        updateThemeLabel();
+        hideMenu();
+      } else if (action === 'cascade') {
+        WindowManager.cascade();
+        hideMenu();
+      } else if (action === 'refresh') {
+        hideMenu();
+        window.location.reload();
+      }
+    });
+  });
 }
 
 function initStorageLab() {
@@ -438,12 +685,16 @@ function initClock() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  ThemeManager.load();
   initTaskbar();
   initWindows();
+  initContextMenu();
   initStorageLab();
   initHtmlStudio();
   initNotes();
   initClock();
+  window.addEventListener('resize', () => WindowManager.enforceBounds());
   // Auto-open Storage Lab at launch for quick benchmarking.
   openWindow('storage');
+  WindowManager.enforceBounds();
 });

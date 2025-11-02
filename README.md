@@ -20,6 +20,16 @@ single-page experience and can be opened directly in any modern browser.
 - **Quick Notes** – Lightweight scratchpad that persists content to `localStorage` and
   provides quick clipboard export.
 
+## Interface highlights
+
+- Right-click anywhere on the desktop wallpaper to reveal a context menu for cascading
+  windows, cycling ambient themes (Horizon, Aurora Drift, Sunrise Bloom), or refreshing the
+  workspace.
+- Windows and the Start menu animate with eased open/close transitions, glassmorphism, and
+  elevated lighting to mirror a polished OS shell.
+- A custom pointer set, floating light accents, and theme-aware taskbar give the workbench a
+  professional Windows-inspired finish while preserving usability.
+
 ## Customisation ideas
 
 - Extend the storage profiles in `app.js` with hardware-specific baselines from your lab.

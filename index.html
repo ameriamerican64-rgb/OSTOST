@@ -15,6 +15,11 @@
 <body>
   <div class="desktop" role="application" aria-label="OSTOST Workbench">
     <div class="desktop-wallpaper" aria-hidden="true"></div>
+    <div class="desktop-lights" aria-hidden="true">
+      <span class="light light-a"></span>
+      <span class="light light-b"></span>
+      <span class="light light-c"></span>
+    </div>
     <div class="desktop-widgets">
       <section class="widget system-widget" aria-label="System snapshot">
         <h2>System Snapshot</h2>
@@ -229,6 +234,27 @@
         </section>
       </div>
     </section>
+
+    <div
+      id="desktopContextMenu"
+      class="context-menu"
+      role="menu"
+      aria-hidden="true"
+      aria-label="Desktop context menu"
+    >
+      <button type="button" class="context-item" role="menuitem" data-action="cycle-theme">
+        <span class="icon">🎨</span>
+        <span class="label">Cycle ambient theme</span>
+      </button>
+      <button type="button" class="context-item" role="menuitem" data-action="cascade">
+        <span class="icon">🪟</span>
+        <span class="label">Cascade open windows</span>
+      </button>
+      <button type="button" class="context-item" role="menuitem" data-action="refresh">
+        <span class="icon">🔁</span>
+        <span class="label">Refresh workspace</span>
+      </button>
+    </div>
   </div>
 
   <footer class="taskbar" role="navigation" aria-label="Taskbar">
